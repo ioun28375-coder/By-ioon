@@ -1,0 +1,274 @@
+-- ====================================================
+-- Universal Multi-Fling Hub (Fixed & Optimized)
+-- ====================================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+
+-- เลือก parent ที่ปลอดภัยสำหรับ Executor (CoreGui หรือ PlayerGui)
+local ParentGui = game:GetService("CoreGui")
+if not pcall(function() local a = ParentGui.Name end) then
+    ParentGui = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- ลบ UI เก่าหากมีอยู่
+if ParentGui:FindFirstChild("MultiFlingHub") then
+    ParentGui.MultiFlingHub:Destroy()
+end
+
+-- ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MultiFlingHub"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = ParentGui
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 320, 0, 380)
+MainFrame.Position = UDim2.new(0.5, -160, 0.5, -190)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true -- ทำให้ลากได้ง่ายบนมือถือ
+MainFrame.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
+
+-- Top Bar
+local TopBar = Instance.new("Frame")
+TopBar.Size = UDim2.new(1, 0, 0, 35)
+TopBar.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+TopBar.BorderSizePixel = 0
+TopBar.Parent = MainFrame
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+TitleLabel.Position = UDim2.new(0, 10, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "MULTI-FLING SYSTEM"
+TitleLabel.TextColor3 = Color3.fromRGB(255, 75, 75)
+TitleLabel.TextSize = 14
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Parent = TopBar
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 25, 0, 25)
+CloseBtn.Position = UDim2.new(1, -30, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(220, 40, 50)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 12
+CloseBtn.Parent = TopBar
+
+local CloseCorner = Instance.new("UICorner")
+CloseCorner.CornerRadius = UDim.new(0, 4)
+CloseCorner.Parent = CloseBtn
+
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Target Counter Label
+local CounterLabel = Instance.new("TextLabel")
+CounterLabel.Size = UDim2.new(1, -20, 0, 20)
+CounterLabel.Position = UDim2.new(0, 10, 0, 40)
+CounterLabel.BackgroundTransparency = 1
+CounterLabel.Text = "0 target(s) selected"
+CounterLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+CounterLabel.Font = Enum.Font.Gotham
+CounterLabel.TextSize = 12
+CounterLabel.TextXAlignment = Enum.TextXAlignment.Left
+CounterLabel.Parent = MainFrame
+
+-- Scrolling Frame For Players
+local ScrollList = Instance.new("ScrollingFrame")
+ScrollList.Size = UDim2.new(1, -20, 1, -150)
+ScrollList.Position = UDim2.new(0, 10, 0, 65)
+ScrollList.BackgroundColor3 = Color3.fromRGB(28, 28, 35)
+ScrollList.BorderSizePixel = 0
+ScrollList.ScrollBarThickness = 4
+ScrollList.Parent = MainFrame
+
+local ListLayout = Instance.new("UIListLayout")
+ListLayout.Padding = UDim.new(0, 4)
+ListLayout.Parent = ScrollList
+
+-- Selection Logic
+local selectedPlayers = {}
+local isFlinging = false
+
+local function updateCount()
+    local count = 0
+    for _, v in pairs(selectedPlayers) do
+        if v then count = count + 1 end
+    end
+    CounterLabel.Text = count .. " target(s) selected"
+end
+
+local function renderPlayerList()
+    for _, item in pairs(ScrollList:GetChildren()) do
+        if item:IsA("Frame") then item:Destroy() end
+    end
+
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local ItemFrame = Instance.new("Frame")
+            ItemFrame.Size = UDim2.new(1, -6, 0, 32)
+            ItemFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+            ItemFrame.Parent = ScrollList
+
+            local ItemCorner = Instance.new("UICorner")
+            ItemCorner.CornerRadius = UDim.new(0, 4)
+            ItemCorner.Parent = ItemFrame
+
+            local ToggleBtn = Instance.new("TextButton")
+            ToggleBtn.Size = UDim2.new(0, 20, 0, 20)
+            ToggleBtn.Position = UDim2.new(0, 8, 0.5, -10)
+            ToggleBtn.BackgroundColor3 = selectedPlayers[p.Name] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 70)
+            ToggleBtn.Text = selectedPlayers[p.Name] and "✓" or ""
+            ToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            ToggleBtn.Font = Enum.Font.GothamBold
+            ToggleBtn.TextSize = 12
+            ToggleBtn.Parent = ItemFrame
+
+            local NameLabel = Instance.new("TextLabel")
+            NameLabel.Size = UDim2.new(1, -40, 1, 0)
+            NameLabel.Position = UDim2.new(0, 35, 0, 0)
+            NameLabel.BackgroundTransparency = 1
+            NameLabel.Text = p.Name
+            NameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
+            NameLabel.Font = Enum.Font.GothamMedium
+            NameLabel.TextSize = 12
+            NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+            NameLabel.Parent = ItemFrame
+
+            ToggleBtn.MouseButton1Click:Connect(function()
+                selectedPlayers[p.Name] = not selectedPlayers[p.Name]
+                ToggleBtn.BackgroundColor3 = selectedPlayers[p.Name] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 70)
+                ToggleBtn.Text = selectedPlayers[p.Name] and "✓" or ""
+                updateCount()
+            end)
+        end
+    end
+    ScrollList.CanvasSize = UDim2.new(0, 0, 0, ListLayout.AbsoluteContentSize.Y + 10)
+end
+
+Players.PlayerAdded:Connect(renderPlayerList)
+Players.PlayerRemoving:Connect(function(p)
+    selectedPlayers[p.Name] = nil
+    renderPlayerList()
+    updateCount()
+end)
+renderPlayerList()
+
+-- Buttons Bottom Area
+local StartBtn = Instance.new("TextButton")
+StartBtn.Size = UDim2.new(0.48, 0, 0, 35)
+StartBtn.Position = UDim2.new(0, 10, 1, -75)
+StartBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 70)
+StartBtn.Text = "START FLING"
+StartBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StartBtn.Font = Enum.Font.GothamBold
+StartBtn.TextSize = 12
+StartBtn.Parent = MainFrame
+
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0.48, 0, 0, 35)
+StopBtn.Position = UDim2.new(0.52, -10, 1, -75)
+StopBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 30)
+StopBtn.Text = "STOP FLING"
+StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopBtn.Font = Enum.Font.GothamBold
+StopBtn.TextSize = 12
+StopBtn.Parent = MainFrame
+
+local SelectAllBtn = Instance.new("TextButton")
+SelectAllBtn.Size = UDim2.new(0.48, 0, 0, 28)
+SelectAllBtn.Position = UDim2.new(0, 10, 1, -33)
+SelectAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+SelectAllBtn.Text = "SELECT ALL"
+SelectAllBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+SelectAllBtn.Font = Enum.Font.GothamBold
+SelectAllBtn.TextSize = 10
+SelectAllBtn.Parent = MainFrame
+
+local DeselectAllBtn = Instance.new("TextButton")
+DeselectAllBtn.Size = UDim2.new(0.48, 0, 0, 28)
+DeselectAllBtn.Position = UDim2.new(0.52, -10, 1, -33)
+DeselectAllBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+DeselectAllBtn.Text = "DESELECT ALL"
+DeselectAllBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+DeselectAllBtn.Font = Enum.Font.GothamBold
+DeselectAllBtn.TextSize = 10
+DeselectAllBtn.Parent = MainFrame
+
+-- Button Events
+SelectAllBtn.MouseButton1Click:Connect(function()
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then selectedPlayers[p.Name] = true end
+    end
+    renderPlayerList()
+    updateCount()
+end)
+
+DeselectAllBtn.MouseButton1Click:Connect(function()
+    selectedPlayers = {}
+    renderPlayerList()
+    updateCount()
+end)
+
+-- Fling Engine
+StartBtn.MouseButton1Click:Connect(function()
+    if isFlinging then return end
+    isFlinging = true
+    
+    task.spawn(function()
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChild("HumanoidRootPart") then isFlinging = false return end
+        local hrp = char.HumanoidRootPart
+        
+        -- สร้างแรงหมุนความเร็วสูง
+        local bav = Instance.new("BodyAngularVelocity")
+        bav.Name = "FlingForce"
+        bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bav.AngularVelocity = Vector3.new(0, 999999, 0)
+        bav.Parent = hrp
+
+        while isFlinging and char and hrp do
+            RunService.Heartbeat:Wait()
+            local targetFound = false
+            for targetName, isSelected in pairs(selectedPlayers) do
+                if isSelected then
+                    local targetPlayer = Players:FindFirstChild(targetName)
+                    if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        targetFound = true
+                        local targetHrp = targetPlayer.Character.HumanoidRootPart
+                        -- วาร์ปไปติดกับเป้าหมายเพื่อดีด
+                        hrp.CFrame = targetHrp.CFrame * CFrame.new(0, 0, 0)
+                        hrp.Velocity = Vector3.new(99999, 99999, 99999)
+                    end
+                end
+            end
+            if not targetFound then task.wait(0.1) end
+        end
+        
+        if bav then bav:Destroy() end
+    end)
+end)
+
+StopBtn.MouseButton1Click:Connect(function()
+    isFlinging = false
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        if hrp:FindFirstChild("FlingForce") then hrp.FlingForce:Destroy() end
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end
+end)
